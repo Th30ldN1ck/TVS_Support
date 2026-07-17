@@ -34,6 +34,24 @@ label:first-child { margin-top: 0; }
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast.ok { background: #10b981; color: #fff; }
 .toast.err { background: #dc2626; color: #fff; }
+.block-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; background: #fafafa; }
+.block-card + .block-card { margin-top: 10px; }
+.block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.block-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af; }
+.block-controls button { background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 14px; padding: 2px 6px; }
+.block-controls button:hover:not(:disabled) { color: #374151; }
+.block-controls button:disabled { cursor: default; }
+.rte { min-height: 44px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 9px 12px; font-size: 13px; line-height: 1.6; background: #fff; }
+.rte:focus { border-color: #e91e8c; box-shadow: 0 0 0 3px rgba(233,30,140,.08); outline: none; }
+.rte:empty:before { content: attr(data-placeholder); color: #9ca3af; }
+.rte strong, .rte b { color: #1f2937 !important; } /* stored markup targets the dark live site; keep it legible while editing */
+.rte-toolbar { display: flex; gap: 4px; margin-bottom: 6px; }
+.rte-toolbar button { border: 1px solid #e5e7eb; background: #fff; border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.rte-toolbar button:hover { background: #f3f4f6; }
+.step-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.step-row input { flex: 1; }
+.step-row button { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 15px; padding: 2px 6px; }
+.step-row button:hover { color: #dc2626; }
 </style>
 </head>
 <body>
@@ -111,15 +129,16 @@ label:first-child { margin-top: 0; }
       <label>Related articles <span style="font-weight:400;text-transform:none;color:#9ca3af;">(comma-separated slugs, shown at the bottom of the article)</span></label>
       <input id="f-related" type="text" placeholder="account-payment, account-invoices">
 
-      <label>Body <span style="font-weight:400;text-transform:none;color:#9ca3af;">(HTML — use the buttons below to insert common blocks)</span></label>
-      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
-        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('p')">+ Paragraph</button>
-        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('h2')">+ Heading</button>
-        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('steps')">+ Numbered Steps</button>
-        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('tip')">+ Tip Box</button>
-        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('note')">+ Note Box</button>
+      <label>Content <span style="font-weight:400;text-transform:none;color:#9ca3af;">(built from simple blocks — no code needed)</span></label>
+      <div id="f-blocks" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="p">+ Paragraph</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="h2">+ Heading</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="steps">+ Numbered Steps</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="tip">+ Tip Box</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="note">+ Note Box</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;color:#9ca3af;" data-add="raw">+ Custom HTML (advanced)</button>
       </div>
-      <textarea id="f-body" rows="14" placeholder="&lt;p&gt;Article content…&lt;/p&gt;"></textarea>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid #f3f4f6;">
         <button id="f-delete" class="btn btn-danger">Delete Article</button>
@@ -149,6 +168,7 @@ label:first-child { margin-top: 0; }
 var PASSWORD = null;
 var ARTICLES = {};
 var editingSlug = null; // null = creating new
+var blocks = []; // the block list currently in the open editor
 
 var CAT_LABELS = {
   account: 'Account & Billing', plans: 'Packages & Plans', streaming: 'Streaming & Playback',
@@ -248,7 +268,8 @@ window.openEditor = function(slug) {
   document.getElementById('f-title').value = a.title || '';
   document.getElementById('f-catslug').value = a.catSlug || 'account';
   document.getElementById('f-related').value = (a.related || []).join(', ');
-  document.getElementById('f-body').value = a.body || '';
+  blocks = slug ? parseBodyToBlocks(a.body || '') : [newBlock('p')];
+  renderBlocks();
   document.getElementById('f-delete').style.display = slug ? 'inline-block' : 'none';
   document.getElementById('editor-wrap').style.display = 'flex';
 };
@@ -257,26 +278,324 @@ function closeEditor() {
   editingSlug = null;
 }
 
-window.insertSnippet = function(kind) {
-  var ta = document.getElementById('f-body');
-  var snippets = {
-    p: '<p>Write a short paragraph here.</p>',
-    h2: '<h2 class="text-white font-bold text-lg mt-6">Section heading</h2>',
-    steps: '<ol class="space-y-4 mt-4"><li class="flex gap-4 items-start"><span class="flex-shrink-0 w-7 h-7 rounded-full text-magenta-400 text-xs font-bold flex items-center justify-center mt-0.5" style="background:rgba(233,30,140,0.15);">1</span><span>First step.</span></li><li class="flex gap-4 items-start"><span class="flex-shrink-0 w-7 h-7 rounded-full text-magenta-400 text-xs font-bold flex items-center justify-center mt-0.5" style="background:rgba(233,30,140,0.15);">2</span><span>Second step.</span></li></ol>',
-    tip: '<div class="rounded-xl border border-magenta-500/20 px-5 py-4" style="background:rgba(233,30,140,0.05);"><p class="text-magenta-400 text-xs font-bold uppercase tracking-wide mb-1">Tip</p><p class="text-gray-400 text-sm">Helpful tip text.</p></div>',
-    note: '<div class="rounded-xl border border-amber-500/20 px-5 py-4" style="background:rgba(245,158,11,0.05);"><p class="text-amber-400 text-xs font-bold uppercase tracking-wide mb-1">Note</p><p class="text-gray-400 text-sm">Important note text.</p></div>'
-  };
-  var snippet = snippets[kind] || '';
-  var start = ta.selectionStart, end = ta.selectionEnd;
-  ta.value = ta.value.slice(0, start) + snippet + ta.value.slice(end);
-  ta.focus();
-  ta.selectionStart = ta.selectionEnd = start + snippet.length;
-};
+/* ── Block editor ─────────────────────────────────────────────────
+   Support-team editors work with plain-text blocks (Paragraph, Heading,
+   Numbered Steps, Tip, Note) instead of raw HTML. Each block serializes
+   to the same HTML templates the old insertSnippet buttons used to
+   paste in, so support.html's rendering doesn't need to change at all.
+   A "Custom HTML (advanced)" block is kept as an escape hatch for the
+   handful of existing articles with tables/icons that don't fit the
+   simple block types — content is preserved verbatim, not lost.
+──────────────────────────────────────────────────────────────────── */
+var BLOCK_LABELS = { p: 'Paragraph', h2: 'Heading', steps: 'Numbered Steps', tip: 'Tip Box', note: 'Note Box', raw: 'Custom HTML (advanced)' };
+
+function newBlock(type) {
+  if (type === 'p') return { type: 'p', html: '' };
+  if (type === 'h2') return { type: 'h2', text: '' };
+  if (type === 'steps') return { type: 'steps', items: ['', ''], start: 1 };
+  if (type === 'tip') return { type: 'tip', text: '' };
+  if (type === 'note') return { type: 'note', text: '' };
+  return { type: 'raw', html: '' };
+}
+
+// Whitelist sanitizer for paragraph rich text — only bold/italic/link survive.
+function sanitizeInline(html) {
+  var ALLOWED = { B: 'strong', STRONG: 'strong', I: 'em', EM: 'em', A: 'a', BR: 'br' };
+  var src = document.createElement('div');
+  src.innerHTML = html || '';
+  function clean(node) {
+    var out = document.createDocumentFragment();
+    node.childNodes.forEach(function(child) {
+      if (child.nodeType === 3) {
+        out.appendChild(child.cloneNode());
+      } else if (child.nodeType === 1) {
+        var mapped = ALLOWED[child.tagName];
+        if (mapped) {
+          var el = document.createElement(mapped);
+          if (mapped === 'strong') {
+            el.setAttribute('class', 'text-white');
+          } else if (mapped === 'a') {
+            var href = child.getAttribute('href') || '#';
+            if (!/^https?:\/\//i.test(href) && !/^#/.test(href) && !/^mailto:/i.test(href)) href = '#';
+            el.setAttribute('href', href);
+            el.setAttribute('class', 'text-magenta-400 hover:underline');
+          }
+          el.appendChild(clean(child));
+          out.appendChild(el);
+        } else {
+          out.appendChild(clean(child)); // unwrap disallowed tag, keep its children
+        }
+      }
+    });
+    return out;
+  }
+  var wrap = document.createElement('div');
+  wrap.appendChild(clean(src));
+  return wrap.innerHTML;
+}
+
+// Step/Tip/Note fields are plain text, but 43 of 46 existing step-lists rely on
+// mid-sentence bold. Rather than give every plain-text field a rich toolbar,
+// support a lightweight **bold** / [text](url) convention (familiar from Slack/
+// WhatsApp) so that formatting survives a round-trip without exposing HTML.
+function htmlToMdLite(node) {
+  var out = '';
+  node.childNodes.forEach(function(child) {
+    if (child.nodeType === 3) {
+      out += child.textContent;
+    } else if (child.nodeType === 1) {
+      var tag = child.tagName;
+      if (tag === 'STRONG' || tag === 'B') {
+        out += '**' + htmlToMdLite(child) + '**';
+      } else if (tag === 'A') {
+        out += '[' + htmlToMdLite(child) + '](' + (child.getAttribute('href') || '#') + ')';
+      } else {
+        out += htmlToMdLite(child); // unwrap unknown inline tags, keep their text
+      }
+    }
+  });
+  return out;
+}
+function mdLiteToHtml(text) {
+  var out = esc(text || '');
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, label, href) {
+    href = href.trim();
+    if (!/^https?:\/\//i.test(href) && !/^#/.test(href) && !/^mailto:/i.test(href)) href = '#';
+    return '<a href="' + href + '" class="text-magenta-400 hover:underline">' + label + '</a>';
+  });
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-white">$1</strong>');
+  return out;
+}
+
+// Best-effort: turn an existing article's stored HTML body into editable blocks.
+function parseBodyToBlocks(bodyHtml) {
+  var src = document.createElement('div');
+  src.innerHTML = bodyHtml || '';
+  var out = [];
+  Array.prototype.forEach.call(src.children, function(el) {
+    var tag = el.tagName;
+    if (tag === 'P' && !el.querySelector('svg,table,ol,div')) {
+      out.push({ type: 'p', html: sanitizeInline(el.innerHTML) });
+    } else if (tag === 'H2') {
+      out.push({ type: 'h2', text: el.textContent.trim() });
+    } else if (tag === 'OL') {
+      var lis = el.querySelectorAll('li');
+      var items = Array.prototype.map.call(lis, function(li) {
+        var spans = li.querySelectorAll('span');
+        var last = spans.length ? spans[spans.length - 1] : li;
+        return htmlToMdLite(last).trim();
+      });
+      // A few articles split one step sequence across two <ol> lists (e.g. an
+      // embedded screenshot in between), where the second list continues the
+      // numbering (4, 5…) instead of restarting at 1 — preserve that.
+      var firstBadge = lis.length ? lis[0].querySelector('span') : null;
+      var startNum = firstBadge && /^\d+$/.test((firstBadge.textContent || '').trim()) ? parseInt(firstBadge.textContent, 10) : 1;
+      out.push({ type: 'steps', items: items.length ? items : [''], start: startNum });
+    } else if (tag === 'DIV' && boxKind(el) === 'tip') {
+      out.push({ type: 'tip', text: boxText(el) });
+    } else if (tag === 'DIV' && boxKind(el) === 'note') {
+      out.push({ type: 'note', text: boxText(el) });
+    } else {
+      out.push({ type: 'raw', html: el.outerHTML });
+    }
+  });
+  return out.length ? out : [newBlock('p')];
+}
+function boxKind(el) {
+  var p = el.querySelector(':scope > p');
+  var t = p ? (p.textContent || '').trim().toLowerCase() : '';
+  return (t === 'tip' || t === 'note') ? t : null;
+}
+function boxText(el) {
+  var ps = el.querySelectorAll(':scope > p');
+  return ps.length > 1 ? htmlToMdLite(ps[1]).trim() : '';
+}
+
+// Assemble the stored article body HTML from the current block list.
+function serializeBlocksToHtml(list) {
+  return list.map(function(b) {
+    if (b.type === 'p') return '<p>' + sanitizeInline(b.html) + '</p>';
+    if (b.type === 'h2') return '<h2 class="text-white font-bold text-lg mt-6">' + esc(b.text) + '</h2>';
+    if (b.type === 'steps') {
+      var startNum = b.start || 1;
+      var lis = (b.items || []).filter(function(t) { return t.trim(); }).map(function(item, i) {
+        return '<li class="flex gap-4 items-start"><span class="flex-shrink-0 w-7 h-7 rounded-full text-magenta-400 text-xs font-bold flex items-center justify-center mt-0.5" style="background:var(--tvn-accent-soft);">' + (startNum + i) + '</span><span>' + mdLiteToHtml(item) + '</span></li>';
+      }).join('');
+      return '<ol class="space-y-4 mt-4">' + lis + '</ol>';
+    }
+    if (b.type === 'tip') return '<div class="rounded-xl border border-magenta-500/20 px-5 py-4" style="background:rgba(233,30,140,0.05);"><p class="text-magenta-400 text-xs font-bold uppercase tracking-wide mb-1">Tip</p><p class="text-gray-400 text-sm">' + mdLiteToHtml(b.text) + '</p></div>';
+    if (b.type === 'note') return '<div class="rounded-xl border border-amber-500/20 px-5 py-4" style="background:rgba(245,158,11,0.05);"><p class="text-amber-400 text-xs font-bold uppercase tracking-wide mb-1">Note</p><p class="text-gray-400 text-sm">' + mdLiteToHtml(b.text) + '</p></div>';
+    return b.html || ''; // raw
+  }).join('\n');
+}
+
+function moveBlock(i, dir) {
+  var j = i + dir;
+  if (j < 0 || j >= blocks.length) return;
+  var tmp = blocks[i]; blocks[i] = blocks[j]; blocks[j] = tmp;
+  renderBlocks();
+}
+function removeBlock(i) {
+  blocks.splice(i, 1);
+  renderBlocks();
+}
+
+function renderBlocks() {
+  var wrap = document.getElementById('f-blocks');
+  wrap.innerHTML = '';
+  if (!blocks.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:12.5px;">No content yet — add a block below.</div>';
+    return;
+  }
+  blocks.forEach(function(b, i) { wrap.appendChild(buildBlockCard(b, i)); });
+}
+
+function mkCtrlBtn(html, disabled, onClick) {
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.innerHTML = html;
+  btn.disabled = !!disabled;
+  if (disabled) btn.style.opacity = '.3';
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
+function buildBlockCard(b, i) {
+  var card = document.createElement('div');
+  card.className = 'block-card';
+
+  var head = document.createElement('div');
+  head.className = 'block-head';
+  var label = document.createElement('span');
+  label.className = 'block-label';
+  label.textContent = BLOCK_LABELS[b.type] || b.type;
+  var controls = document.createElement('div');
+  controls.className = 'block-controls';
+  controls.appendChild(mkCtrlBtn('&uarr;', i === 0, function() { moveBlock(i, -1); }));
+  controls.appendChild(mkCtrlBtn('&darr;', i === blocks.length - 1, function() { moveBlock(i, 1); }));
+  controls.appendChild(mkCtrlBtn('&times;', false, function() { removeBlock(i); }));
+  head.appendChild(label);
+  head.appendChild(controls);
+  card.appendChild(head);
+  card.appendChild(buildBlockBody(b, i));
+  return card;
+}
+
+function buildStepRow(b, si) {
+  var row = document.createElement('div');
+  row.className = 'step-row';
+  var badge = document.createElement('span');
+  badge.textContent = (si + 1) + '.';
+  badge.style.cssText = 'color:#9ca3af;font-size:12px;width:18px;flex-shrink:0;';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = b.items[si] || '';
+  input.placeholder = 'Step text… (use **bold** for emphasis, [text](url) for a link)';
+  input.addEventListener('input', function() { b.items[si] = input.value; });
+  var del = mkCtrlBtn('&times;', false, function() { b.items.splice(si, 1); renderBlocks(); });
+  row.appendChild(badge);
+  row.appendChild(input);
+  row.appendChild(del);
+  return row;
+}
+
+function buildBlockBody(b, i) {
+  var box = document.createElement('div');
+
+  if (b.type === 'p') {
+    var toolbar = document.createElement('div');
+    toolbar.className = 'rte-toolbar';
+    var boldBtn = document.createElement('button'); boldBtn.type = 'button'; boldBtn.innerHTML = '<b>B</b>';
+    var linkBtn = document.createElement('button'); linkBtn.type = 'button'; linkBtn.textContent = 'Link';
+    var rte = document.createElement('div');
+    rte.className = 'rte';
+    rte.contentEditable = 'true';
+    rte.setAttribute('data-placeholder', 'Write a paragraph…');
+    rte.innerHTML = b.html || '';
+    [boldBtn, linkBtn].forEach(function(btn) { btn.addEventListener('mousedown', function(e) { e.preventDefault(); }); });
+    boldBtn.addEventListener('click', function() { rte.focus(); document.execCommand('bold'); b.html = rte.innerHTML; });
+    linkBtn.addEventListener('click', function() {
+      var url = prompt('Link URL:', 'https://');
+      if (url) { rte.focus(); document.execCommand('createLink', false, url); b.html = rte.innerHTML; }
+    });
+    rte.addEventListener('input', function() { b.html = rte.innerHTML; });
+    toolbar.appendChild(boldBtn);
+    toolbar.appendChild(linkBtn);
+    box.appendChild(toolbar);
+    box.appendChild(rte);
+
+  } else if (b.type === 'h2') {
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = b.text || '';
+    input.placeholder = 'Section heading';
+    input.addEventListener('input', function() { b.text = input.value; });
+    box.appendChild(input);
+
+  } else if (b.type === 'steps') {
+    var list = document.createElement('div');
+    (b.items || []).forEach(function(item, si) { list.appendChild(buildStepRow(b, si)); });
+    box.appendChild(list);
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;';
+    var addStep = document.createElement('button');
+    addStep.type = 'button';
+    addStep.className = 'btn btn-secondary';
+    addStep.style.cssText = 'padding:5px 10px;font-size:11.5px;';
+    addStep.textContent = '+ Add step';
+    addStep.addEventListener('click', function() { b.items.push(''); renderBlocks(); });
+    row.appendChild(addStep);
+    if (b.start && b.start !== 1) {
+      var startLabel = document.createElement('label');
+      startLabel.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;margin:0;text-transform:none;font-weight:600;';
+      startLabel.textContent = 'Starts at #';
+      var startInput = document.createElement('input');
+      startInput.type = 'text';
+      startInput.value = b.start;
+      startInput.style.cssText = 'width:44px;padding:4px 6px;font-size:12px;';
+      startInput.addEventListener('input', function() { b.start = parseInt(startInput.value, 10) || 1; });
+      startLabel.appendChild(startInput);
+      row.appendChild(startLabel);
+    }
+    box.appendChild(row);
+
+  } else if (b.type === 'tip' || b.type === 'note') {
+    var ta = document.createElement('textarea');
+    ta.rows = 2;
+    ta.value = b.text || '';
+    ta.placeholder = (b.type === 'tip' ? 'Helpful tip text…' : 'Important note text…') + ' (use **bold** for emphasis)';
+    ta.style.fontFamily = 'inherit';
+    ta.style.fontSize = '13px';
+    ta.addEventListener('input', function() { b.text = ta.value; });
+    box.appendChild(ta);
+
+  } else { // raw
+    var hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;margin-bottom:6px;';
+    hint.textContent = "Raw HTML — for advanced content (tables, icons) that doesn't fit the simple blocks above.";
+    var ta2 = document.createElement('textarea');
+    ta2.rows = 6;
+    ta2.value = b.html || '';
+    ta2.style.fontFamily = "'SFMono-Regular', Consolas, monospace";
+    ta2.style.fontSize = '12px';
+    ta2.addEventListener('input', function() { b.html = ta2.value; });
+    box.appendChild(hint);
+    box.appendChild(ta2);
+  }
+  return box;
+}
+
+document.querySelectorAll('#editor-wrap [data-add]').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    blocks.push(newBlock(btn.getAttribute('data-add')));
+    renderBlocks();
+  });
+});
 
 /* ── Preview ──────────────────────────────────────────────────────── */
 document.getElementById('f-preview').addEventListener('click', function() {
   document.getElementById('preview-title').textContent = document.getElementById('f-title').value || '(untitled)';
-  document.getElementById('preview-body').innerHTML = document.getElementById('f-body').value;
+  document.getElementById('preview-body').innerHTML = serializeBlocksToHtml(blocks);
   document.getElementById('preview-wrap').style.display = 'flex';
 });
 document.getElementById('preview-close').addEventListener('click', function() {
@@ -303,13 +622,13 @@ function callApi(payload) {
 document.getElementById('f-save').addEventListener('click', function() {
   var slug = document.getElementById('f-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
   var title = document.getElementById('f-title').value.trim();
-  var body = document.getElementById('f-body').value;
+  var body = serializeBlocksToHtml(blocks);
   var catSlug = document.getElementById('f-catslug').value;
   var related = document.getElementById('f-related').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
 
   if (!slug) { showToast('Slug is required', false); return; }
   if (!title) { showToast('Title is required', false); return; }
-  if (!body.trim()) { showToast('Body is required', false); return; }
+  if (!body.replace(/<[^>]+>/g, '').trim()) { showToast('Add some content first', false); return; }
 
   var saveBtn = document.getElementById('f-save');
   saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
