@@ -221,7 +221,7 @@ function renderList(filter) {
         + '<div style="font-size:13px;color:#374151;">' + esc(item.title) + '</div>'
         + '<div style="font-size:11px;color:#9ca3af;font-family:monospace;margin-top:1px;">' + esc(item.slug) + '</div>'
         + '</div>'
-        + '<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;flex-shrink:0;" onclick="openEditor(' + JSON.stringify(item.slug) + ')">Edit</button>'
+        + '<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;flex-shrink:0;" data-slug="' + esc(item.slug) + '">Edit</button>'
         + '</div>';
     });
     html += '</div>';
@@ -230,6 +230,10 @@ function renderList(filter) {
   wrap.innerHTML = html;
 }
 document.getElementById('search').addEventListener('input', function() { renderList(); });
+document.getElementById('list').addEventListener('click', function(e) {
+  var btn = e.target.closest('button[data-slug]');
+  if (btn) openEditor(btn.getAttribute('data-slug'));
+});
 
 /* ── Editor ───────────────────────────────────────────────────────── */
 document.getElementById('new-btn').addEventListener('click', function() { openEditor(null); });
