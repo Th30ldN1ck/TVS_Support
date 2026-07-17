@@ -3,8 +3,11 @@
 // this is the one place that holds the GitHub token and checks the CMS password.
 //
 // POST body shapes:
-//   Save/update: { password, slug, article: { title, category, catSlug, body, related? } }
+//   Save/update: { password, slug, article: { catSlug, en: {title, body}, th?: {title, body}, related? } }
 //   Delete:      { password, deleteSlug }
+//
+// Articles are bilingual (en required, th optional — an empty/missing th
+// falls back to English on the live site, see support.html's localized()).
 //
 // On success, commits the updated articles.json straight to the repo's default
 // branch. Vercel is already wired to auto-deploy on push, so a save here goes
@@ -60,15 +63,29 @@ module.exports = async function handler(request, response) {
       response.status(400).json({ error: 'Missing article data' });
       return;
     }
-    for (const field of ['title', 'category', 'catSlug', 'body']) {
-      if (!article[field] || typeof article[field] !== 'string') {
-        response.status(400).json({ error: 'Missing or invalid field: ' + field });
-        return;
-      }
-    }
-    if (KNOWN_CAT_SLUGS.indexOf(article.catSlug) === -1) {
+    if (!article.catSlug || typeof article.catSlug !== 'string' || KNOWN_CAT_SLUGS.indexOf(article.catSlug) === -1) {
       response.status(400).json({ error: 'catSlug must be one of: ' + KNOWN_CAT_SLUGS.join(', ') });
       return;
+    }
+    const en = article.en;
+    if (!en || typeof en !== 'object' || !en.title || typeof en.title !== 'string' || !en.body || typeof en.body !== 'string') {
+      response.status(400).json({ error: 'Missing or invalid English title/body (en.title, en.body)' });
+      return;
+    }
+    const th = article.th;
+    if (th !== undefined) {
+      if (typeof th !== 'object' || th === null) {
+        response.status(400).json({ error: 'th must be an object with title/body strings' });
+        return;
+      }
+      if (th.title !== undefined && typeof th.title !== 'string') {
+        response.status(400).json({ error: 'th.title must be a string' });
+        return;
+      }
+      if (th.body !== undefined && typeof th.body !== 'string') {
+        response.status(400).json({ error: 'th.body must be a string' });
+        return;
+      }
     }
     if (article.related !== undefined && !Array.isArray(article.related)) {
       response.status(400).json({ error: 'related must be an array of slugs' });
@@ -103,12 +120,11 @@ module.exports = async function handler(request, response) {
     } else {
       action = targetSlug in currentJson ? 'update' : 'add';
       currentJson[targetSlug] = {
-        title: article.title,
-        category: article.category,
         catSlug: article.catSlug,
         updated: new Date().toISOString().slice(0, 10),
-        body: article.body,
         related: Array.isArray(article.related) ? article.related : [],
+        en: { title: article.en.title, body: article.en.body },
+        th: { title: (article.th && article.th.title) || '', body: (article.th && article.th.body) || '' },
       };
     }
 

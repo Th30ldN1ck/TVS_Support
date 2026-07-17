@@ -52,6 +52,10 @@ label:first-child { margin-top: 0; }
 .step-row input { flex: 1; }
 .step-row button { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 15px; padding: 2px 6px; }
 .step-row button:hover { color: #dc2626; }
+.lang-tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 8px 14px 9px; font-size: 12.5px; font-weight: 700; color: #9ca3af; cursor: pointer; margin-bottom: -1px; }
+.lang-tab:hover { color: #374151; }
+.lang-tab.active { color: #e91e8c; border-bottom-color: #e91e8c; }
+.lang-tab .lang-tab-badge { display: inline-block; margin-left: 5px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 999px; padding: 1px 6px; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -113,9 +117,6 @@ label:first-child { margin-top: 0; }
       <label>Slug <span style="font-weight:400;text-transform:none;color:#9ca3af;">(lowercase, hyphens only — e.g. account-cancel)</span></label>
       <input id="f-slug" type="text" placeholder="e.g. account-cancel">
 
-      <label>Title</label>
-      <input id="f-title" type="text" placeholder="Question as it appears to users">
-
       <label>Category</label>
       <select id="f-catslug">
         <option value="account">Account &amp; Billing</option>
@@ -128,6 +129,14 @@ label:first-child { margin-top: 0; }
 
       <label>Related articles <span style="font-weight:400;text-transform:none;color:#9ca3af;">(comma-separated slugs, shown at the bottom of the article)</span></label>
       <input id="f-related" type="text" placeholder="account-payment, account-invoices">
+
+      <div id="lang-tabs" style="display:flex;gap:4px;margin-top:22px;border-bottom:1px solid #e5e7eb;">
+        <button type="button" class="lang-tab" data-lang="en">English</button>
+        <button type="button" class="lang-tab" data-lang="th">ภาษาไทย</button>
+      </div>
+
+      <label>Title</label>
+      <input id="f-title" type="text" placeholder="Question as it appears to users">
 
       <label>Content <span style="font-weight:400;text-transform:none;color:#9ca3af;">(built from simple blocks — no code needed)</span></label>
       <div id="f-blocks" style="margin-bottom:10px;"></div>
@@ -169,7 +178,16 @@ label:first-child { margin-top: 0; }
 var PASSWORD = null;
 var ARTICLES = {};
 var editingSlug = null; // null = creating new
-var blocks = []; // the block list currently in the open editor
+
+/* Articles are bilingual: { catSlug, related, en:{title,body}, th:{title,body} }.
+   The editor keeps both languages' title/blocks in memory at once (titleByLang /
+   blocksByLang) so switching tabs doesn't lose what you typed in the other one;
+   `blocks` is just a live reference to whichever language tab is active, since
+   the block-editing functions below were written against a single global array. */
+var titleByLang = { en: '', th: '' };
+var blocksByLang = { en: [], th: [] };
+var editLang = 'en';
+var blocks = blocksByLang.en;
 
 var CAT_LABELS = {
   account: 'Account & Billing', plans: 'Packages & Plans', streaming: 'Streaming & Playback',
@@ -222,10 +240,11 @@ function renderList(filter) {
   var groups = {};
   Object.keys(ARTICLES).forEach(function(slug) {
     var a = ARTICLES[slug];
-    if (f && (slug + ' ' + (a.title || '')).toLowerCase().indexOf(f) === -1) return;
+    var title = (a.en && a.en.title) || slug;
+    if (f && (slug + ' ' + title).toLowerCase().indexOf(f) === -1) return;
     var key = a.catSlug || 'other';
     if (!groups[key]) groups[key] = [];
-    groups[key].push({ slug: slug, title: a.title || slug });
+    groups[key].push({ slug: slug, title: title });
   });
 
   var order = ['account', 'plans', 'streaming', 'devices', 'downloads', 'parental'];
@@ -266,11 +285,16 @@ window.openEditor = function(slug) {
   document.getElementById('f-slug').value = slug || '';
   document.getElementById('f-slug').readOnly = !!slug;
   document.getElementById('f-slug').style.background = slug ? '#f3f4f6' : '#fff';
-  document.getElementById('f-title').value = a.title || '';
   document.getElementById('f-catslug').value = a.catSlug || 'account';
   document.getElementById('f-related').value = (a.related || []).join(', ');
-  blocks = slug ? parseBodyToBlocks(a.body || '') : [newBlock('p')];
-  renderBlocks();
+
+  titleByLang = { en: (a.en && a.en.title) || '', th: (a.th && a.th.title) || '' };
+  blocksByLang = {
+    en: slug ? parseBodyToBlocks((a.en && a.en.body) || '') : [newBlock('p')],
+    th: slug ? parseBodyToBlocks((a.th && a.th.body) || '') : [newBlock('p')],
+  };
+  activateLangTab('en');
+
   document.getElementById('f-delete').style.display = slug ? 'inline-block' : 'none';
   document.getElementById('editor-wrap').style.display = 'flex';
 };
@@ -278,6 +302,34 @@ function closeEditor() {
   document.getElementById('editor-wrap').style.display = 'none';
   editingSlug = null;
 }
+
+/* ── Language tabs ────────────────────────────────────────────────
+   Switching tabs swaps which language's title/blocks the shared Title
+   input and block editor are pointed at. Nothing is lost when you
+   switch away — titleByLang/blocksByLang hold both languages at once.
+   activateLangTab() just points the UI at a language (used when opening
+   the editor, where there's no "previous tab" to capture from yet);
+   setEditLang() is for the tab-click handler, which additionally saves
+   whatever was just typed in the outgoing tab before switching. */
+function activateLangTab(lang) {
+  editLang = lang;
+  blocks = blocksByLang[lang];
+  document.getElementById('f-title').value = titleByLang[lang];
+  document.querySelectorAll('.lang-tab').forEach(function(btn) {
+    btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+  });
+  renderBlocks();
+}
+function setEditLang(lang) {
+  titleByLang[editLang] = document.getElementById('f-title').value;
+  activateLangTab(lang);
+}
+document.querySelectorAll('.lang-tab').forEach(function(btn) {
+  btn.addEventListener('click', function() { setEditLang(btn.getAttribute('data-lang')); });
+});
+document.getElementById('f-title').addEventListener('input', function() {
+  titleByLang[editLang] = document.getElementById('f-title').value;
+});
 
 /* ── Block editor ─────────────────────────────────────────────────
    Support-team editors work with plain-text blocks (Paragraph, Heading,
@@ -692,7 +744,7 @@ imagePickerInput.addEventListener('change', function() {
 /* ── Preview ──────────────────────────────────────────────────────── */
 document.getElementById('f-preview').addEventListener('click', function() {
   document.getElementById('preview-title').textContent = document.getElementById('f-title').value || '(untitled)';
-  document.getElementById('preview-body').innerHTML = serializeBlocksToHtml(blocks);
+  document.getElementById('preview-body').innerHTML = serializeBlocksToHtml(blocksByLang[editLang]);
   document.getElementById('preview-wrap').style.display = 'flex';
 });
 document.getElementById('preview-close').addEventListener('click', function() {
@@ -722,25 +774,39 @@ function callApi(payload, endpoint) {
   });
 }
 
+function hasBlockContent(list) {
+  var body = serializeBlocksToHtml(list);
+  return !!(body.replace(/<[^>]+>/g, '').trim() || list.some(function(b) { return b.type === 'image' && b.src; }));
+}
+
 document.getElementById('f-save').addEventListener('click', function() {
+  titleByLang[editLang] = document.getElementById('f-title').value; // capture whatever tab is currently visible
   var slug = document.getElementById('f-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
-  var title = document.getElementById('f-title').value.trim();
-  var body = serializeBlocksToHtml(blocks);
+  var titleEn = titleByLang.en.trim();
+  var titleTh = titleByLang.th.trim();
   var catSlug = document.getElementById('f-catslug').value;
   var related = document.getElementById('f-related').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  var bodyEn = serializeBlocksToHtml(blocksByLang.en);
+  var bodyTh = serializeBlocksToHtml(blocksByLang.th);
 
   if (!slug) { showToast('Slug is required', false); return; }
-  if (!title) { showToast('Title is required', false); return; }
-  if (blocks.some(function(b) { return b.type === 'image' && b.uploading; })) { showToast('Wait for the image upload to finish', false); return; }
-  var hasContent = body.replace(/<[^>]+>/g, '').trim() || blocks.some(function(b) { return b.type === 'image' && b.src; });
-  if (!hasContent) { showToast('Add some content first', false); return; }
+  if (!titleEn) { showToast('English title is required (Thai can be filled in later)', false); return; }
+  if ([].concat(blocksByLang.en, blocksByLang.th).some(function(b) { return b.type === 'image' && b.uploading; })) {
+    showToast('Wait for the image upload to finish', false); return;
+  }
+  if (!hasBlockContent(blocksByLang.en)) { showToast('Add some English content first', false); return; }
 
   var saveBtn = document.getElementById('f-save');
   saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
 
   callApi({
     slug: slug,
-    article: { title: title, category: CAT_LABELS[catSlug], catSlug: catSlug, body: body, related: related }
+    article: {
+      catSlug: catSlug,
+      related: related,
+      en: { title: titleEn, body: bodyEn },
+      th: { title: titleTh, body: titleTh ? bodyTh : '' },
+    }
   }).then(function(data) {
     showToast('Saved "' + data.slug + '"', true);
     closeEditor();
