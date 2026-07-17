@@ -137,6 +137,7 @@ label:first-child { margin-top: 0; }
         <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="steps">+ Numbered Steps</button>
         <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="tip">+ Tip Box</button>
         <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="note">+ Note Box</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" data-add="image">+ Image</button>
         <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;color:#9ca3af;" data-add="raw">+ Custom HTML (advanced)</button>
       </div>
 
@@ -287,7 +288,7 @@ function closeEditor() {
    handful of existing articles with tables/icons that don't fit the
    simple block types — content is preserved verbatim, not lost.
 ──────────────────────────────────────────────────────────────────── */
-var BLOCK_LABELS = { p: 'Paragraph', h2: 'Heading', steps: 'Numbered Steps', tip: 'Tip Box', note: 'Note Box', raw: 'Custom HTML (advanced)' };
+var BLOCK_LABELS = { p: 'Paragraph', h2: 'Heading', steps: 'Numbered Steps', tip: 'Tip Box', note: 'Note Box', image: 'Image', raw: 'Custom HTML (advanced)' };
 
 function newBlock(type) {
   if (type === 'p') return { type: 'p', html: '' };
@@ -295,6 +296,7 @@ function newBlock(type) {
   if (type === 'steps') return { type: 'steps', items: ['', ''], start: 1 };
   if (type === 'tip') return { type: 'tip', text: '' };
   if (type === 'note') return { type: 'note', text: '' };
+  if (type === 'image') return { type: 'image', src: '', alt: '', uploading: false };
   return { type: 'raw', html: '' };
 }
 
@@ -395,6 +397,8 @@ function parseBodyToBlocks(bodyHtml) {
       out.push({ type: 'tip', text: boxText(el) });
     } else if (tag === 'DIV' && boxKind(el) === 'note') {
       out.push({ type: 'note', text: boxText(el) });
+    } else if (tag === 'IMG') {
+      out.push({ type: 'image', src: el.getAttribute('src') || '', alt: el.getAttribute('alt') || '', uploading: false });
     } else {
       out.push({ type: 'raw', html: el.outerHTML });
     }
@@ -425,8 +429,9 @@ function serializeBlocksToHtml(list) {
     }
     if (b.type === 'tip') return '<div class="rounded-xl border border-magenta-500/20 px-5 py-4" style="background:rgba(233,30,140,0.05);"><p class="text-magenta-400 text-xs font-bold uppercase tracking-wide mb-1">Tip</p><p class="text-gray-400 text-sm">' + mdLiteToHtml(b.text) + '</p></div>';
     if (b.type === 'note') return '<div class="rounded-xl border border-amber-500/20 px-5 py-4" style="background:rgba(245,158,11,0.05);"><p class="text-amber-400 text-xs font-bold uppercase tracking-wide mb-1">Note</p><p class="text-gray-400 text-sm">' + mdLiteToHtml(b.text) + '</p></div>';
+    if (b.type === 'image') return b.src ? ('<img src="' + esc(b.src) + '" alt="' + esc(b.alt) + '" class="rounded-xl w-full" loading="lazy">') : '';
     return b.html || ''; // raw
-  }).join('\n');
+  }).filter(Boolean).join('\n');
 }
 
 function moveBlock(i, dir) {
@@ -569,6 +574,52 @@ function buildBlockBody(b, i) {
     ta.addEventListener('input', function() { b.text = ta.value; });
     box.appendChild(ta);
 
+  } else if (b.type === 'image') {
+    var previewUrl = b.previewSrc || b.src;
+    if (previewUrl) {
+      var thumb = document.createElement('img');
+      thumb.src = previewUrl;
+      thumb.style.cssText = 'max-width:100%;max-height:180px;border-radius:8px;display:block;margin-bottom:8px;border:1px solid #e5e7eb;' + (b.uploading ? 'opacity:.5;' : '');
+      box.appendChild(thumb);
+
+      if (b.uploading) {
+        var loading = document.createElement('div');
+        loading.style.cssText = 'font-size:12px;color:#9ca3af;margin-bottom:8px;';
+        loading.textContent = 'Uploading…';
+        box.appendChild(loading);
+      }
+
+      var altInput = document.createElement('input');
+      altInput.type = 'text';
+      altInput.value = b.alt || '';
+      altInput.placeholder = 'Describe the image (for accessibility)';
+      altInput.style.marginBottom = '8px';
+      altInput.disabled = b.uploading;
+      altInput.addEventListener('input', function() { b.alt = altInput.value; });
+      box.appendChild(altInput);
+
+      var replaceBtn = document.createElement('button');
+      replaceBtn.type = 'button';
+      replaceBtn.className = 'btn btn-secondary';
+      replaceBtn.style.cssText = 'padding:5px 10px;font-size:11.5px;';
+      replaceBtn.disabled = b.uploading;
+      replaceBtn.textContent = 'Replace image';
+      replaceBtn.addEventListener('click', function() { triggerImagePicker(b); });
+      box.appendChild(replaceBtn);
+    } else {
+      var pickBtn = document.createElement('button');
+      pickBtn.type = 'button';
+      pickBtn.className = 'btn btn-secondary';
+      pickBtn.style.cssText = 'padding:8px 14px;font-size:12.5px;';
+      pickBtn.textContent = 'Choose image…';
+      pickBtn.addEventListener('click', function() { triggerImagePicker(b); });
+      box.appendChild(pickBtn);
+      var imgHint = document.createElement('div');
+      imgHint.style.cssText = 'font-size:11px;color:#9ca3af;margin-top:6px;';
+      imgHint.textContent = 'PNG, JPEG, GIF, or WebP — max 2MB.';
+      box.appendChild(imgHint);
+    }
+
   } else { // raw
     var hint = document.createElement('div');
     hint.style.cssText = 'font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;margin-bottom:6px;';
@@ -592,6 +643,52 @@ document.querySelectorAll('#editor-wrap [data-add]').forEach(function(btn) {
   });
 });
 
+/* ── Image upload — one shared hidden <input type=file>, reused by every
+   Image block's "Choose/Replace image" button. Uploads commit straight to
+   the repo's uploads/ folder via /api/upload-image (same GitHub-backed
+   pattern as article saves), and go live once Vercel's auto-deploy picks
+   up the resulting commit — usually well under a minute. ─────────────── */
+var imagePickerInput = document.createElement('input');
+imagePickerInput.type = 'file';
+imagePickerInput.accept = 'image/png,image/jpeg,image/gif,image/webp';
+imagePickerInput.style.display = 'none';
+document.body.appendChild(imagePickerInput);
+var imagePickerTarget = null;
+
+function triggerImagePicker(block) {
+  imagePickerTarget = block;
+  imagePickerInput.value = '';
+  imagePickerInput.click();
+}
+
+imagePickerInput.addEventListener('change', function() {
+  var file = imagePickerInput.files[0];
+  var block = imagePickerTarget;
+  if (!file || !block) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('Image is too large (max 2MB)', false);
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function() {
+    block.previewSrc = reader.result; // instant local preview — doesn't wait on the deploy
+    block.uploading = true;
+    renderBlocks();
+    callApi({ filename: file.name, dataUrl: reader.result }, '/api/upload-image')
+      .then(function(data) {
+        block.src = data.path;
+        block.uploading = false;
+        renderBlocks();
+      })
+      .catch(function(err) {
+        block.uploading = false;
+        renderBlocks();
+        showToast(err.message, false);
+      });
+  };
+  reader.readAsDataURL(file);
+});
+
 /* ── Preview ──────────────────────────────────────────────────────── */
 document.getElementById('f-preview').addEventListener('click', function() {
   document.getElementById('preview-title').textContent = document.getElementById('f-title').value || '(untitled)';
@@ -602,12 +699,12 @@ document.getElementById('preview-close').addEventListener('click', function() {
   document.getElementById('preview-wrap').style.display = 'none';
 });
 
-/* ── Save / Delete — both go through /api/save-article ──────────────
-   which is the only place holding the GitHub token + real password
-   check. A wrong password here shows an error and clears the stored
-   one so the gate re-prompts. ─────────────────────────────────────── */
-function callApi(payload) {
-  return fetch('/api/save-article', {
+/* ── Save / Delete / Upload — all go through password-gated endpoints
+   which are the only place holding the GitHub token + real password
+   check. A wrong password on any of them clears the stored one so the
+   gate re-prompts. ──────────────────────────────────────────────────── */
+function callApi(payload, endpoint) {
+  return fetch(endpoint || '/api/save-article', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(Object.assign({ password: PASSWORD }, payload))
@@ -616,6 +713,12 @@ function callApi(payload) {
       if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
       return data;
     });
+  }).catch(function(err) {
+    if (/incorrect password/i.test(err.message)) {
+      try { sessionStorage.removeItem('tvn_cms_pw'); } catch (e) {}
+      PASSWORD = null;
+    }
+    throw err;
   });
 }
 
@@ -628,7 +731,9 @@ document.getElementById('f-save').addEventListener('click', function() {
 
   if (!slug) { showToast('Slug is required', false); return; }
   if (!title) { showToast('Title is required', false); return; }
-  if (!body.replace(/<[^>]+>/g, '').trim()) { showToast('Add some content first', false); return; }
+  if (blocks.some(function(b) { return b.type === 'image' && b.uploading; })) { showToast('Wait for the image upload to finish', false); return; }
+  var hasContent = body.replace(/<[^>]+>/g, '').trim() || blocks.some(function(b) { return b.type === 'image' && b.src; });
+  if (!hasContent) { showToast('Add some content first', false); return; }
 
   var saveBtn = document.getElementById('f-save');
   saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
@@ -641,10 +746,6 @@ document.getElementById('f-save').addEventListener('click', function() {
     closeEditor();
     loadArticles();
   }).catch(function(err) {
-    if (/incorrect password/i.test(err.message)) {
-      try { sessionStorage.removeItem('tvn_cms_pw'); } catch (e) {}
-      PASSWORD = null;
-    }
     showToast(err.message, false);
   }).finally(function() {
     saveBtn.disabled = false; saveBtn.textContent = 'Save';
@@ -663,10 +764,6 @@ document.getElementById('f-delete').addEventListener('click', function() {
     closeEditor();
     loadArticles();
   }).catch(function(err) {
-    if (/incorrect password/i.test(err.message)) {
-      try { sessionStorage.removeItem('tvn_cms_pw'); } catch (e) {}
-      PASSWORD = null;
-    }
     showToast(err.message, false);
   }).finally(function() {
     delBtn.disabled = false; delBtn.textContent = 'Delete Article';
