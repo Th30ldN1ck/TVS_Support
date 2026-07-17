@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Support CMS | TrueVisions NOW</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: { colors: { magenta: { 300:'#f97dbe',400:'#f542a8',500:'#e91e8c',600:'#d6007d',700:'#b5006a' } } } }
+}
+</script>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f5f7; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; color: #1f2937; }
+input[type=text], input[type=password], select, textarea {
+  width: 100%; border: 1px solid #e5e7eb; border-radius: 8px; padding: 9px 12px;
+  font-size: 13px; color: #1f2937; outline: none; font-family: inherit; background: #fff;
+}
+input:focus, select:focus, textarea:focus { border-color: #e91e8c; box-shadow: 0 0 0 3px rgba(233,30,140,0.08); }
+textarea { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12.5px; line-height: 1.6; resize: vertical; }
+label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; display: block; margin-bottom: 5px; margin-top: 14px; }
+label:first-child { margin-top: 0; }
+.btn { border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.btn-primary { background: #e91e8c; color: #fff; }
+.btn-primary:hover { background: #d6007d; }
+.btn-primary:disabled { background: #f0a8ce; cursor: default; }
+.btn-secondary { background: #f3f4f6; color: #374151; }
+.btn-secondary:hover { background: #e5e7eb; }
+.btn-danger { background: #fee2e2; color: #dc2626; }
+.btn-danger:hover { background: #fecaca; }
+.toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 20px rgba(0,0,0,.15); z-index: 9999; transform: translateY(80px); opacity: 0; transition: all .3s; pointer-events: none; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.ok { background: #10b981; color: #fff; }
+.toast.err { background: #dc2626; color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     PASSWORD GATE — client-side only for UX. The real check happens
+     server-side in /api/save-article on every save/delete; this just
+     avoids showing the editor to someone who obviously doesn't have
+     the password. Don't treat this screen as real security.
+================================================================ -->
+<div id="gate" style="position:fixed;inset:0;background:#0a0a12;display:flex;align-items:center;justify-content:center;z-index:100;">
+  <div style="width:100%;max-width:340px;padding:0 20px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(233,30,140,.12);border:1px solid rgba(233,30,140,.25);border-radius:999px;padding:5px 16px;margin-bottom:14px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#e91e8c;display:inline-block;"></span>
+        <span style="color:#e91e8c;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;">Support CMS</span>
+      </div>
+      <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0;">TrueVisions NOW</h1>
+      <p style="color:#6b7280;font-size:13px;margin:4px 0 0;">Support article editor</p>
+    </div>
+    <input id="gate-pw" type="password" placeholder="Password" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:#fff;margin-bottom:10px;">
+    <button id="gate-btn" class="btn btn-primary" style="width:100%;padding:11px;">Enter</button>
+    <p id="gate-hint" style="color:#6b7280;font-size:11px;text-align:center;margin-top:10px;">Password is checked when you save your first change.</p>
+  </div>
+</div>
+
+<!-- ================================================================
+     MAIN CMS UI
+================================================================ -->
+<div id="app" style="display:none;">
+  <div style="background:#0a0a12;border-bottom:1px solid rgba(255,255,255,.08);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:#e91e8c;"></span>
+      <span style="color:#fff;font-weight:800;font-size:14px;">TVN Support CMS</span>
+    </div>
+    <a href="support.html" style="color:#9ca3af;font-size:12.5px;text-decoration:none;">View live support site &rarr;</a>
+  </div>
+
+  <div style="max-width:900px;margin:0 auto;padding:24px 20px 80px;">
+    <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <input id="search" type="text" placeholder="Search articles by title or slug…" style="flex:1;">
+      <button id="new-btn" class="btn btn-primary" style="white-space:nowrap;">+ New Article</button>
+    </div>
+
+    <div id="list"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     EDITOR PANEL
+================================================================ -->
+<div id="editor-wrap" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:680px;max-height:calc(100vh - 40px);overflow-y:auto;">
+    <div style="padding:18px 22px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">
+      <span id="editor-heading" style="font-weight:800;font-size:15px;">Edit Article</span>
+      <button id="editor-close" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:22px;">
+      <label>Slug <span style="font-weight:400;text-transform:none;color:#9ca3af;">(lowercase, hyphens only — e.g. account-cancel)</span></label>
+      <input id="f-slug" type="text" placeholder="e.g. account-cancel">
+
+      <label>Title</label>
+      <input id="f-title" type="text" placeholder="Question as it appears to users">
+
+      <label>Category</label>
+      <select id="f-catslug">
+        <option value="account">Account &amp; Billing</option>
+        <option value="plans">Packages &amp; Plans</option>
+        <option value="streaming">Streaming &amp; Playback</option>
+        <option value="devices">Devices &amp; Apps</option>
+        <option value="downloads">Downloads &amp; Offline</option>
+        <option value="parental">Parental Controls</option>
+      </select>
+
+      <label>Related articles <span style="font-weight:400;text-transform:none;color:#9ca3af;">(comma-separated slugs, shown at the bottom of the article)</span></label>
+      <input id="f-related" type="text" placeholder="account-payment, account-invoices">
+
+      <label>Body <span style="font-weight:400;text-transform:none;color:#9ca3af;">(HTML — use the buttons below to insert common blocks)</span></label>
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('p')">+ Paragraph</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('h2')">+ Heading</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('steps')">+ Numbered Steps</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('tip')">+ Tip Box</button>
+        <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:11.5px;" onclick="insertSnippet('note')">+ Note Box</button>
+      </div>
+      <textarea id="f-body" rows="14" placeholder="&lt;p&gt;Article content…&lt;/p&gt;"></textarea>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid #f3f4f6;">
+        <button id="f-delete" class="btn btn-danger">Delete Article</button>
+        <div style="display:flex;gap:8px;">
+          <button id="f-preview" class="btn btn-secondary">Preview</button>
+          <button id="f-save" class="btn btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview panel — renders the body HTML roughly as it'll look on the article page -->
+<div id="preview-wrap" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#0a0a16;border-radius:14px;width:100%;max-width:680px;max-height:calc(100vh - 40px);overflow-y:auto;padding:32px;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      <button id="preview-close" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;">&times;</button>
+    </div>
+    <h1 id="preview-title" style="color:#fff;font-size:26px;font-weight:800;margin:0 0 20px;"></h1>
+    <div id="preview-body" style="color:#d1d5db;font-size:14.5px;line-height:1.7;"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+var PASSWORD = null;
+var ARTICLES = {};
+var editingSlug = null; // null = creating new
+
+var CAT_LABELS = {
+  account: 'Account & Billing', plans: 'Packages & Plans', streaming: 'Streaming & Playback',
+  devices: 'Devices & Apps', downloads: 'Downloads & Offline', parental: 'Parental Controls'
+};
+
+function esc(s) { return (s || '').replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function showToast(msg, ok) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (ok ? 'ok' : 'err');
+  setTimeout(function() { t.className = 'toast ' + (ok ? 'ok' : 'err'); }, 2600);
+}
+
+/* ── Gate ─────────────────────────────────────────────────────────── */
+document.getElementById('gate-btn').addEventListener('click', enterGate);
+document.getElementById('gate-pw').addEventListener('keydown', function(e) { if (e.key === 'Enter') enterGate(); });
+function enterGate() {
+  var pw = document.getElementById('gate-pw').value;
+  if (!pw) return;
+  PASSWORD = pw;
+  try { sessionStorage.setItem('tvn_cms_pw', pw); } catch (e) {}
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadArticles();
+}
+(function() {
+  try {
+    var saved = sessionStorage.getItem('tvn_cms_pw');
+    if (saved) {
+      PASSWORD = saved;
+      document.getElementById('gate').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      loadArticles();
+    }
+  } catch (e) {}
+})();
+
+/* ── Load + render article list ──────────────────────────────────── */
+function loadArticles() {
+  fetch('articles.json?v=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) { ARTICLES = data; renderList(); })
+    .catch(function(err) { showToast('Failed to load articles.json: ' + err.message, false); });
+}
+
+function renderList(filter) {
+  var wrap = document.getElementById('list');
+  var f = (filter || document.getElementById('search').value || '').trim().toLowerCase();
+  var groups = {};
+  Object.keys(ARTICLES).forEach(function(slug) {
+    var a = ARTICLES[slug];
+    if (f && (slug + ' ' + (a.title || '')).toLowerCase().indexOf(f) === -1) return;
+    var key = a.catSlug || 'other';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push({ slug: slug, title: a.title || slug });
+  });
+
+  var order = ['account', 'plans', 'streaming', 'devices', 'downloads', 'parental'];
+  var html = '';
+  order.forEach(function(catSlug) {
+    var items = groups[catSlug];
+    if (!items || !items.length) return;
+    items.sort(function(a, b) { return a.title.localeCompare(b.title); });
+    html += '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:14px;">'
+      + '<div style="padding:10px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:800;color:#111;text-transform:uppercase;letter-spacing:.05em;">' + esc(CAT_LABELS[catSlug]) + ' <span style="color:#9ca3af;font-weight:600;">(' + items.length + ')</span></div>';
+    items.forEach(function(item) {
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid #f3f4f6;">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:13px;color:#374151;">' + esc(item.title) + '</div>'
+        + '<div style="font-size:11px;color:#9ca3af;font-family:monospace;margin-top:1px;">' + esc(item.slug) + '</div>'
+        + '</div>'
+        + '<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;flex-shrink:0;" onclick="openEditor(' + JSON.stringify(item.slug) + ')">Edit</button>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+  if (!html) html = '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:13px;">No articles match "' + esc(f) + '"</div>';
+  wrap.innerHTML = html;
+}
+document.getElementById('search').addEventListener('input', function() { renderList(); });
+
+/* ── Editor ───────────────────────────────────────────────────────── */
+document.getElementById('new-btn').addEventListener('click', function() { openEditor(null); });
+document.getElementById('editor-close').addEventListener('click', closeEditor);
+window.openEditor = function(slug) {
+  editingSlug = slug;
+  var a = (slug && ARTICLES[slug]) || {};
+  document.getElementById('editor-heading').textContent = slug ? 'Edit Article' : 'New Article';
+  document.getElementById('f-slug').value = slug || '';
+  document.getElementById('f-slug').readOnly = !!slug;
+  document.getElementById('f-slug').style.background = slug ? '#f3f4f6' : '#fff';
+  document.getElementById('f-title').value = a.title || '';
+  document.getElementById('f-catslug').value = a.catSlug || 'account';
+  document.getElementById('f-related').value = (a.related || []).join(', ');
+  document.getElementById('f-body').value = a.body || '';
+  document.getElementById('f-delete').style.display = slug ? 'inline-block' : 'none';
+  document.getElementById('editor-wrap').style.display = 'flex';
+};
+function closeEditor() {
+  document.getElementById('editor-wrap').style.display = 'none';
+  editingSlug = null;
+}
+
+window.insertSnippet = function(kind) {
+  var ta = document.getElementById('f-body');
+  var snippets = {
+    p: '<p>Write a short paragraph here.</p>',
+    h2: '<h2 class="text-white font-bold text-lg mt-6">Section heading</h2>',
+    steps: '<ol class="space-y-4 mt-4"><li class="flex gap-4 items-start"><span class="flex-shrink-0 w-7 h-7 rounded-full text-magenta-400 text-xs font-bold flex items-center justify-center mt-0.5" style="background:rgba(233,30,140,0.15);">1</span><span>First step.</span></li><li class="flex gap-4 items-start"><span class="flex-shrink-0 w-7 h-7 rounded-full text-magenta-400 text-xs font-bold flex items-center justify-center mt-0.5" style="background:rgba(233,30,140,0.15);">2</span><span>Second step.</span></li></ol>',
+    tip: '<div class="rounded-xl border border-magenta-500/20 px-5 py-4" style="background:rgba(233,30,140,0.05);"><p class="text-magenta-400 text-xs font-bold uppercase tracking-wide mb-1">Tip</p><p class="text-gray-400 text-sm">Helpful tip text.</p></div>',
+    note: '<div class="rounded-xl border border-amber-500/20 px-5 py-4" style="background:rgba(245,158,11,0.05);"><p class="text-amber-400 text-xs font-bold uppercase tracking-wide mb-1">Note</p><p class="text-gray-400 text-sm">Important note text.</p></div>'
+  };
+  var snippet = snippets[kind] || '';
+  var start = ta.selectionStart, end = ta.selectionEnd;
+  ta.value = ta.value.slice(0, start) + snippet + ta.value.slice(end);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = start + snippet.length;
+};
+
+/* ── Preview ──────────────────────────────────────────────────────── */
+document.getElementById('f-preview').addEventListener('click', function() {
+  document.getElementById('preview-title').textContent = document.getElementById('f-title').value || '(untitled)';
+  document.getElementById('preview-body').innerHTML = document.getElementById('f-body').value;
+  document.getElementById('preview-wrap').style.display = 'flex';
+});
+document.getElementById('preview-close').addEventListener('click', function() {
+  document.getElementById('preview-wrap').style.display = 'none';
+});
+
+/* ── Save / Delete — both go through /api/save-article ──────────────
+   which is the only place holding the GitHub token + real password
+   check. A wrong password here shows an error and clears the stored
+   one so the gate re-prompts. ─────────────────────────────────────── */
+function callApi(payload) {
+  return fetch('/api/save-article', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ password: PASSWORD }, payload))
+  }).then(function(r) {
+    return r.json().then(function(data) {
+      if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
+      return data;
+    });
+  });
+}
+
+document.getElementById('f-save').addEventListener('click', function() {
+  var slug = document.getElementById('f-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  var title = document.getElementById('f-title').value.trim();
+  var body = document.getElementById('f-body').value;
+  var catSlug = document.getElementById('f-catslug').value;
+  var related = document.getElementById('f-related').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+
+  if (!slug) { showToast('Slug is required', false); return; }
+  if (!title) { showToast('Title is required', false); return; }
+  if (!body.trim()) { showToast('Body is required', false); return; }
+
+  var saveBtn = document.getElementById('f-save');
+  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+  callApi({
+    slug: slug,
+    article: { title: title, category: CAT_LABELS[catSlug], catSlug: catSlug, body: body, related: related }
+  }).then(function(data) {
+    showToast('Saved "' + data.slug + '"', true);
+    closeEditor();
+    loadArticles();
+  }).catch(function(err) {
+    if (/incorrect password/i.test(err.message)) {
+      try { sessionStorage.removeItem('tvn_cms_pw'); } catch (e) {}
+      PASSWORD = null;
+    }
+    showToast(err.message, false);
+  }).finally(function() {
+    saveBtn.disabled = false; saveBtn.textContent = 'Save';
+  });
+});
+
+document.getElementById('f-delete').addEventListener('click', function() {
+  if (!editingSlug) return;
+  if (!confirm('Delete "' + editingSlug + '"? This commits the deletion straight to the repo and cannot be undone from here.')) return;
+
+  var delBtn = document.getElementById('f-delete');
+  delBtn.disabled = true; delBtn.textContent = 'Deleting…';
+
+  callApi({ deleteSlug: editingSlug }).then(function() {
+    showToast('Deleted "' + editingSlug + '"', true);
+    closeEditor();
+    loadArticles();
+  }).catch(function(err) {
+    if (/incorrect password/i.test(err.message)) {
+      try { sessionStorage.removeItem('tvn_cms_pw'); } catch (e) {}
+      PASSWORD = null;
+    }
+    showToast(err.message, false);
+  }).finally(function() {
+    delBtn.disabled = false; delBtn.textContent = 'Delete Article';
+  });
+});
+</script>
+</body>
+</html>
