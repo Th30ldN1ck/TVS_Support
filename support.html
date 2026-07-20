@@ -330,6 +330,9 @@ window.I18N = {
     form_opt_other: 'Other',
     form_label_message: 'What\'s going on?',
     form_placeholder_message: 'Tell us what\'s happening and we\'ll take it from there…',
+    form_label_attachments: 'Attachments',
+    form_attachments_optional: '(optional)',
+    form_attach_button: '+ Add screenshots or video',
     btn_submit_request: 'Submit Request',
     modal_success_heading: 'Request received',
     modal_success_message: 'We\'ll get back to you at the email you provided, usually within a few hours.',
@@ -437,6 +440,9 @@ window.I18N = {
     form_opt_other: 'อื่นๆ',
     form_label_message: 'เกิดอะไรขึ้น?',
     form_placeholder_message: 'บอกเราว่าเกิดอะไรขึ้น แล้วเราจะดำเนินการต่อให้…',
+    form_label_attachments: 'ไฟล์แนบ',
+    form_attachments_optional: '(ไม่บังคับ)',
+    form_attach_button: '+ แนบภาพหน้าจอหรือวิดีโอ',
     btn_submit_request: 'ส่งคำร้องขอ',
     modal_success_heading: 'ได้รับคำร้องขอแล้ว',
     modal_success_message: 'เราจะติดต่อกลับไปยังอีเมลที่คุณให้ไว้ โดยปกติภายในไม่กี่ชั่วโมง',
@@ -1049,9 +1055,14 @@ tvnApplyI18n();
     </select>
 
     <label data-i18n="form_label_message" class="text-gray-400 text-xs font-semibold uppercase tracking-wide" style="display:block;margin-bottom:6px;">What's going on?</label>
-    <textarea id="tvn-contact-message" required data-i18n-placeholder="form_placeholder_message" placeholder="Tell us what's happening and we'll take it from there…" rows="4" style="width:100%;background:var(--tvn-input-bg);border:1px solid var(--tvn-border);border-radius:10px;padding:10px 12px;color:var(--tvn-text-primary);font-size:13.5px;outline:none;resize:vertical;margin-bottom:18px;font-family:inherit;"></textarea>
+    <textarea id="tvn-contact-message" required data-i18n-placeholder="form_placeholder_message" placeholder="Tell us what's happening and we'll take it from there…" rows="4" style="width:100%;background:var(--tvn-input-bg);border:1px solid var(--tvn-border);border-radius:10px;padding:10px 12px;color:var(--tvn-text-primary);font-size:13.5px;outline:none;resize:vertical;margin-bottom:6px;font-family:inherit;"></textarea>
 
-    <button type="submit" data-i18n="btn_submit_request" class="w-full inline-flex items-center justify-center gap-2 bg-magenta-500 hover:bg-magenta-600 font-semibold px-5 py-2.5 rounded-full text-sm transition-all glow" style="color:#fff;">Submit Request</button>
+    <label class="text-gray-400 text-xs font-semibold uppercase tracking-wide" style="display:block;margin-bottom:6px;"><span data-i18n="form_label_attachments">Attachments</span> <span style="font-weight:400;text-transform:none;color:var(--tvn-text-muted);" data-i18n="form_attachments_optional">(optional)</span></label>
+    <input id="tvn-contact-files" type="file" accept="image/*,video/*" multiple style="display:none;">
+    <button type="button" id="tvn-contact-attach-btn" data-i18n="form_attach_button" style="display:inline-flex;align-items:center;gap:6px;background:var(--tvn-btn-secondary-bg);border:1px solid var(--tvn-border);color:var(--tvn-text-secondary);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:999px;cursor:pointer;margin-bottom:10px;">+ Add screenshots or video</button>
+    <div id="tvn-contact-file-list" style="margin-bottom:8px;"></div>
+
+    <button type="submit" data-i18n="btn_submit_request" class="w-full inline-flex items-center justify-center gap-2 bg-magenta-500 hover:bg-magenta-600 font-semibold px-5 py-2.5 rounded-full text-sm transition-all glow" style="color:#fff;margin-top:12px;">Submit Request</button>
    </form>
   </div>
 
@@ -1074,6 +1085,52 @@ tvnApplyI18n();
     return known.indexOf(prefix) > -1 ? prefix : 'other';
   }
 
+  /* ── Attachments ──────────────────────────────────────────────────
+     This whole contact form is a front-end mock — submissions are only
+     ever written to localStorage, there's no real backend to send files
+     to. So attachments are captured client-side (name/size/type) and
+     stored alongside the mock request, same fidelity as the rest of the
+     form, rather than actually uploading anything. If a real submission
+     backend gets built later, this is the place to wire in real uploads. */
+  var selectedFiles = [];
+
+  function escName(s) {
+    return (s || '').replace(/[&<>"']/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+  function renderFileList() {
+    var wrap = document.getElementById('tvn-contact-file-list');
+    if (!wrap) return;
+    wrap.innerHTML = selectedFiles.map(function(f, i) {
+      var isVideo = f.type.indexOf('video/') === 0;
+      var icon = isVideo
+        ? '<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.55-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.45.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>'
+        : '<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--tvn-input-bg);border:1px solid var(--tvn-border);border-radius:8px;margin-bottom:6px;">'
+        + '<svg style="width:14px;height:14px;flex-shrink:0;color:var(--tvn-text-muted);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">' + icon + '</svg>'
+        + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--tvn-text-secondary);">' + escName(f.name) + '</span>'
+        + '<span style="color:var(--tvn-text-muted);flex-shrink:0;font-size:11px;">' + formatFileSize(f.size) + '</span>'
+        + '<button type="button" onclick="window._tvnContactRemoveFile(' + i + ')" aria-label="Remove" style="background:none;border:none;color:var(--tvn-text-muted);cursor:pointer;font-size:15px;flex-shrink:0;padding:0 2px;line-height:1;">&times;</button>'
+        + '</div>';
+    }).join('');
+  }
+  window._tvnContactRemoveFile = function(i) {
+    selectedFiles.splice(i, 1);
+    renderFileList();
+  };
+  document.getElementById('tvn-contact-attach-btn').addEventListener('click', function() {
+    document.getElementById('tvn-contact-files').click();
+  });
+  document.getElementById('tvn-contact-files').addEventListener('change', function(e) {
+    Array.prototype.forEach.call(e.target.files, function(f) { selectedFiles.push(f); });
+    e.target.value = ''; // allow re-selecting the same file after removing it
+    renderFileList();
+  });
+
   window._tvnContactOpen = function() {
     var backdrop = document.getElementById('tvn-contact-backdrop');
     if (!backdrop) return;
@@ -1082,6 +1139,8 @@ tvnApplyI18n();
     document.getElementById('tvn-contact-success').classList.add('hidden');
     var form = document.getElementById('tvn-contact-form');
     if (form) form.reset();
+    selectedFiles = [];
+    renderFileList();
     var h = (location.hash || '').replace('#', '');
     if (h.indexOf('support/') === 0) {
       var slug = h.slice(8);
@@ -1111,18 +1170,22 @@ tvnApplyI18n();
     var message = document.getElementById('tvn-contact-message').value.trim();
     if (!name || !email || !message) return false;
 
+    var attachments = selectedFiles.map(function(f) { return { name: f.name, size: f.size, type: f.type }; });
+
     var requests = [];
     try { requests = JSON.parse(localStorage.getItem('tvn_contact_requests') || '[]'); } catch (err) {}
     requests.unshift({
-      name: name, email: email, category: category, message: message,
+      name: name, email: email, category: category, message: message, attachments: attachments,
       slug: (location.hash || '').replace('#support/', ''),
       ts: Date.now()
     });
     if (requests.length > 200) requests = requests.slice(0, 200);
     localStorage.setItem('tvn_contact_requests', JSON.stringify(requests));
 
-    window.__tvnTrack && window.__tvnTrack({ event: 'contact_form_submit', category: category });
+    window.__tvnTrack && window.__tvnTrack({ event: 'contact_form_submit', category: category, attachment_count: attachments.length });
 
+    selectedFiles = [];
+    renderFileList();
     document.getElementById('tvn-contact-form-wrap').classList.add('hidden');
     document.getElementById('tvn-contact-success').classList.remove('hidden');
     return false;
