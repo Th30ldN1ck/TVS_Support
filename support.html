@@ -279,6 +279,8 @@ window.I18N = {
     survey_opt_not_relevant: 'This article did not address what I was searching for',
     survey_opt_confusing: 'The wording used in this article made it confusing',
     survey_opt_other: 'Other',
+    survey_other_placeholder: '(Optional) Let us know how we can do better. We do not respond to individual feedback. Please do not leave personal information.',
+    btn_submit: 'Submit',
     survey_thanks_heading: 'Thanks for letting us know.',
     survey_thanks_sub: 'Here are some more ways to get help.',
     related_heading: 'Related articles',
@@ -389,6 +391,8 @@ window.I18N = {
     survey_opt_not_relevant: 'บทความนี้ไม่ตรงกับสิ่งที่ฉันกำลังค้นหา',
     survey_opt_confusing: 'การใช้คำในบทความนี้ทำให้เข้าใจยาก',
     survey_opt_other: 'อื่นๆ',
+    survey_other_placeholder: '(ไม่บังคับ) บอกเราว่าเราจะปรับปรุงอย่างไรได้บ้าง เราจะไม่ตอบกลับความคิดเห็นเป็นรายบุคคล กรุณาอย่าใส่ข้อมูลส่วนตัว',
+    btn_submit: 'ส่ง',
     survey_thanks_heading: 'ขอบคุณสำหรับข้อมูล',
     survey_thanks_sub: 'นี่คือช่องทางอื่นๆ ในการขอความช่วยเหลือ',
     related_heading: 'บทความที่เกี่ยวข้อง',
@@ -707,6 +711,10 @@ tvnApplyI18n();
  <input type="radio" name="sa-survey-reason" value="other" onchange="window._tvnSurveyAnswered(this)" style="width:19px;height:19px;accent-color:var(--tvn-accent);flex-shrink:0;">
  <span data-i18n="survey_opt_other" class="text-gray-300 text-[15px] group-hover:text-white transition-colors">Other</span>
  </label>
+ <div id="sa-survey-other-box" class="hidden" style="margin-left:31px;">
+ <textarea id="sa-survey-other-text" rows="3" data-i18n-placeholder="survey_other_placeholder" placeholder="(Optional) Let us know how we can do better. We do not respond to individual feedback. Please do not leave personal information." style="width:100%;background:var(--tvn-input-bg);border:1px solid var(--tvn-border);border-radius:10px;padding:10px 12px;color:var(--tvn-text-primary);font-size:13px;line-height:1.5;outline:none;resize:vertical;font-family:inherit;margin-bottom:10px;"></textarea>
+ <button type="button" onclick="window._tvnSurveyOtherSubmit()" data-i18n="btn_submit" style="background:var(--tvn-accent);color:#fff;font-weight:700;font-size:13px;padding:9px 22px;border-radius:8px;border:none;cursor:pointer;">Submit</button>
+ </div>
  </div>
  <div id="sa-survey-thanks" class="hidden">
  <p data-i18n="survey_thanks_heading" class="text-white text-sm font-medium mb-1">Thanks for letting us know.</p>
@@ -755,16 +763,42 @@ tvnApplyI18n();
     window.__tvnTrack && window.__tvnTrack({ event: 'article_not_helpful', slug: (location.hash || '').replace('#support/', '') });
   };
 
-  window._tvnSurveyAnswered = function(radio) {
+  function finishSurvey(reason, feedbackText) {
     var opts = document.getElementById('sa-survey-options');
     var thanks = document.getElementById('sa-survey-thanks');
+    var otherBox = document.getElementById('sa-survey-other-box');
+    if (otherBox) otherBox.classList.add('hidden');
     if (opts) opts.classList.add('hidden');
     if (thanks) thanks.classList.remove('hidden');
-    window.__tvnTrack && window.__tvnTrack({ event: 'article_feedback_reason', reason: radio.value, slug: (location.hash || '').replace('#support/', '') });
+    var payload = { event: 'article_feedback_reason', reason: reason, slug: (location.hash || '').replace('#support/', '') };
+    if (feedbackText) payload.feedback = feedbackText;
+    window.__tvnTrack && window.__tvnTrack(payload);
     setTimeout(function() {
       var contact = document.getElementById('sa-contact');
       if (contact) contact.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 700);
+  }
+
+  window._tvnSurveyAnswered = function(radio) {
+    var otherBox = document.getElementById('sa-survey-other-box');
+    if (radio.value === 'other') {
+      // Reveal the free-text box instead of finishing right away — the
+      // "Other" option waits for an explicit Submit (see screenshot),
+      // unlike the other three reasons which finish immediately.
+      if (otherBox) {
+        otherBox.classList.remove('hidden');
+        var ta = document.getElementById('sa-survey-other-text');
+        if (ta) setTimeout(function() { ta.focus(); }, 50);
+      }
+      return;
+    }
+    if (otherBox) otherBox.classList.add('hidden');
+    finishSurvey(radio.value, '');
+  };
+
+  window._tvnSurveyOtherSubmit = function() {
+    var ta = document.getElementById('sa-survey-other-text');
+    finishSurvey('other', ta ? ta.value.trim() : '');
   };
 
   /* Reset feedback UI whenever a (new) article renders, so switching
@@ -775,11 +809,15 @@ tvnApplyI18n();
     var panel = document.getElementById('sa-survey');
     var opts = document.getElementById('sa-survey-options');
     var thanks = document.getElementById('sa-survey-thanks');
+    var otherBox = document.getElementById('sa-survey-other-box');
+    var otherText = document.getElementById('sa-survey-other-text');
     if (yesBtn) { yesBtn.textContent = window.I18N[window._tvnLang()].btn_yes_helpful; yesBtn.disabled = false; yesBtn.style.opacity = ''; }
     if (noBtn) { noBtn.disabled = false; noBtn.style.opacity = ''; noBtn.style.cursor = ''; }
     if (panel) panel.classList.add('hidden');
     if (opts) { opts.classList.remove('hidden'); opts.querySelectorAll('input[type=radio]').forEach(function(r) { r.checked = false; }); }
     if (thanks) thanks.classList.add('hidden');
+    if (otherBox) otherBox.classList.add('hidden');
+    if (otherText) otherText.value = '';
   };
 })();
 </script>
