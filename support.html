@@ -539,9 +539,12 @@ tvnApplyI18n();
  </div>
 
  <!-- Search box pins to the very top of the viewport once scrolled past — the
-      header itself scrolls away normally, matching Netflix Help Center. The
-      dividing line only appears once it's actually pinned (see the
-      IntersectionObserver below), not while it's still in normal flow. -->
+      header itself scrolls away normally, matching Netflix Help Center. It's a
+      top-level sibling (not nested in the short hero div above) since a sticky
+      element can only stay pinned while scrolling within its own parent's
+      height — nesting it inside the hero would make it scroll away once that
+      div's own (short) height had passed. Its background matches the hero
+      gradient's faded-out end value so there's no visible seam against it. -->
  <div id="tvn-search-sentinel" style="height:1px;"></div>
  <div id="tvn-search-sticky-wrap" class="tvn-search-sticky" style="position:sticky;top:0;z-index:40;background:var(--tvn-bg-list);">
  <div class="max-w-xl mx-auto px-6" style="padding-top:2px;padding-bottom:14px;">
@@ -564,7 +567,7 @@ tvnApplyI18n();
  })();
  </script>
 
- <div class="text-center px-6 pb-14" style="background:var(--tvn-hero-gradient);">
+ <div class="text-center px-6 pb-14">
  <div class="max-w-xl mx-auto">
  <p class="text-gray-600 text-xs"><span data-i18n="hero_recommended_label">Recommended for you:</span>
  <a href="#support/account-cancel" data-i18n="hero_link_cancel" class="text-gray-400 hover:text-magenta-400 underline underline-offset-2 transition-colors">How to cancel</a>,
