@@ -192,7 +192,7 @@ html[data-theme="light"] .hover\:bg-magenta-600:hover { background-color: #00000
      Minimal header — this is a standalone site (support.html),
      separate from the main TrueVisions NOW app (index.html).
 ================================================================ -->
-<header style="position:sticky;top:0;z-index:40;background:var(--tvn-bg-header);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--tvn-divider);">
+<header style="position:static;z-index:40;background:var(--tvn-bg-header);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--tvn-divider);">
  <div class="max-w-screen-xl mx-auto px-6 lg:px-14 py-4 flex items-center justify-between gap-6">
   <div class="flex items-center gap-4">
    <a href="#support" class="flex-shrink-0 transition-transform hover:scale-105">
@@ -537,8 +537,9 @@ tvnApplyI18n();
  </div>
  </div>
 
- <!-- Search box sticks under the header once scrolled past, so it's always reachable. -->
- <div id="tvn-search-sticky-wrap" style="position:sticky;top:69px;z-index:30;background:var(--tvn-bg-list);border-bottom:1px solid var(--tvn-divider);">
+ <!-- Search box pins to the very top of the viewport once scrolled past — the
+      header itself scrolls away normally, matching Netflix Help Center. -->
+ <div id="tvn-search-sticky-wrap" style="position:sticky;top:0;z-index:40;background:var(--tvn-bg-list);border-bottom:1px solid var(--tvn-divider);">
  <div class="max-w-xl mx-auto px-6" style="padding-top:2px;padding-bottom:14px;">
  <div class="relative">
  <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
