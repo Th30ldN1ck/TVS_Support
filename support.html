@@ -98,6 +98,7 @@ html[data-theme="dark"] {
   --tvn-scrollbar-thumb-subtle: rgba(255,255,255,0.12);
   --tvn-shadow-panel: 0 20px 60px rgba(0,0,0,0.55);
   --tvn-toggle-icon: #f9d34c;
+  --tvn-btn-border-strong: rgba(255,255,255,0.4);
   /* Brand accent — magenta in dark, stays the brand color */
   --tvn-accent: #e91e8c;
   --tvn-accent-hover: #d6007d;
@@ -131,6 +132,7 @@ html[data-theme="light"] {
   --tvn-scrollbar-thumb-subtle: rgba(15,23,42,0.15);
   --tvn-shadow-panel: 0 20px 50px rgba(15,23,42,0.18);
   --tvn-toggle-icon: #1d1d1f;
+  --tvn-btn-border-strong: rgba(15,23,42,0.85);
   /* Apple-style monochrome accent — black/grey instead of brand magenta */
   --tvn-accent: #1d1d1f;
   --tvn-accent-hover: #000000;
@@ -147,6 +149,8 @@ body { background-color: var(--tvn-bg-page); font-family: 'Inter', sans-serif; o
 .glow { box-shadow: var(--tvn-glow); transition: box-shadow .2s ease; }
 .glow:hover { box-shadow: var(--tvn-glow-hover); }
 .hidden { display: none !important; }
+#sa-yes-btn:hover, #sa-not-helpful-btn:hover { background: var(--tvn-card-bg-hover); }
+#sa-yes-btn:disabled, #sa-not-helpful-btn:disabled { cursor: default; }
 
 /* ── Tailwind utility overrides for light theme ─────────────────────
    Tailwind CDN generates fixed values per class, so it can't read CSS
@@ -687,10 +691,14 @@ tvnApplyI18n();
  <div id="sa-body" class="text-gray-300 text-[15px] leading-relaxed space-y-5"></div>
  <!-- Helpful -->
  <div class="mt-12 pt-8 border-t border-white/8">
- <p data-i18n="article_helpful_q" class="text-gray-400 text-sm mb-4">Was this article helpful?</p>
- <div class="flex gap-3" id="sa-helpful-btns">
- <button id="sa-yes-btn" data-i18n="btn_yes_helpful" onclick="window._tvnHelpfulYes(this)" class="px-5 py-2 rounded-full border border-white/12 text-sm text-gray-300 hover:border-magenta-500/40 hover:text-magenta-400 transition-all">Yes, it helped</button>
- <button id="sa-not-helpful-btn" data-i18n="btn_no_need_help" onclick="window._tvnShowSurvey()" class="px-5 py-2 rounded-full border border-white/12 text-sm text-gray-300 hover:border-magenta-500/40 hover:text-magenta-400 transition-all">No, I still need help</button>
+ <p data-i18n="article_helpful_q" class="font-bold mb-5" style="color:var(--tvn-text-primary);font-size:24px;">Was this article helpful?</p>
+ <div class="flex flex-wrap gap-3" id="sa-helpful-btns">
+ <button id="sa-yes-btn" onclick="window._tvnHelpfulYes(this)" class="inline-flex items-center gap-2.5 rounded-full transition-all" style="padding:15px 30px;font-size:16px;font-weight:700;border:2px solid var(--tvn-btn-border-strong);color:var(--tvn-text-primary);background:transparent;">
+ <span aria-hidden="true">👍</span><span id="sa-yes-btn-label" data-i18n="btn_yes_helpful">Yes, it helped</span>
+ </button>
+ <button id="sa-not-helpful-btn" onclick="window._tvnShowSurvey()" class="inline-flex items-center gap-2.5 rounded-full transition-all" style="padding:15px 30px;font-size:16px;font-weight:700;border:2px solid var(--tvn-btn-border-strong);color:var(--tvn-text-primary);background:transparent;">
+ <span aria-hidden="true">👎</span><span data-i18n="btn_no_need_help">No, I still need help</span>
+ </button>
  </div>
  <div id="sa-survey" class="hidden mt-8 pt-8 border-t border-white/8">
  <p data-i18n="survey_heading" class="text-white font-bold text-base mb-5">What went wrong?</p>
@@ -746,7 +754,8 @@ tvnApplyI18n();
    pattern), then scrolls to contact after a reason is picked. ────── */
 (function() {
   window._tvnHelpfulYes = function(btn) {
-    btn.textContent = window.I18N[window._tvnLang()].btn_yes_helpful_thanks;
+    var label = document.getElementById('sa-yes-btn-label');
+    if (label) label.textContent = window.I18N[window._tvnLang()].btn_yes_helpful_thanks;
     btn.disabled = true;
     btn.style.opacity = '0.6';
     window.__tvnTrack && window.__tvnTrack({ event: 'article_helpful_yes', slug: (location.hash || '').replace('#support/', '') });
@@ -811,7 +820,9 @@ tvnApplyI18n();
     var thanks = document.getElementById('sa-survey-thanks');
     var otherBox = document.getElementById('sa-survey-other-box');
     var otherText = document.getElementById('sa-survey-other-text');
-    if (yesBtn) { yesBtn.textContent = window.I18N[window._tvnLang()].btn_yes_helpful; yesBtn.disabled = false; yesBtn.style.opacity = ''; }
+    var yesLabel = document.getElementById('sa-yes-btn-label');
+    if (yesLabel) yesLabel.textContent = window.I18N[window._tvnLang()].btn_yes_helpful;
+    if (yesBtn) { yesBtn.disabled = false; yesBtn.style.opacity = ''; }
     if (noBtn) { noBtn.disabled = false; noBtn.style.opacity = ''; noBtn.style.cursor = ''; }
     if (panel) panel.classList.add('hidden');
     if (opts) { opts.classList.remove('hidden'); opts.querySelectorAll('input[type=radio]').forEach(function(r) { r.checked = false; }); }
