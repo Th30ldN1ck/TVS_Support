@@ -691,12 +691,12 @@ tvnApplyI18n();
  <div id="sa-body" class="text-gray-300 text-[15px] leading-relaxed space-y-5"></div>
  <!-- Helpful -->
  <div class="mt-12 pt-8 border-t border-white/8">
- <p data-i18n="article_helpful_q" class="font-bold mb-5" style="color:var(--tvn-text-primary);font-size:24px;">Was this article helpful?</p>
- <div class="flex flex-wrap gap-3" id="sa-helpful-btns">
- <button id="sa-yes-btn" onclick="window._tvnHelpfulYes(this)" class="inline-flex items-center gap-2.5 rounded-full transition-all" style="padding:15px 30px;font-size:16px;font-weight:700;border:2px solid var(--tvn-btn-border-strong);color:var(--tvn-text-primary);background:transparent;">
+ <p data-i18n="article_helpful_q" class="text-gray-400 text-sm mb-4">Was this article helpful?</p>
+ <div class="flex gap-3" id="sa-helpful-btns">
+ <button id="sa-yes-btn" onclick="window._tvnHelpfulYes(this)" class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-sm text-gray-300 hover:text-magenta-400 transition-all" style="border:2px solid var(--tvn-btn-border-strong);">
  <span aria-hidden="true">👍</span><span id="sa-yes-btn-label" data-i18n="btn_yes_helpful">Yes, it helped</span>
  </button>
- <button id="sa-not-helpful-btn" onclick="window._tvnShowSurvey()" class="inline-flex items-center gap-2.5 rounded-full transition-all" style="padding:15px 30px;font-size:16px;font-weight:700;border:2px solid var(--tvn-btn-border-strong);color:var(--tvn-text-primary);background:transparent;">
+ <button id="sa-not-helpful-btn" onclick="window._tvnShowSurvey()" class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-sm text-gray-300 hover:text-magenta-400 transition-all" style="border:2px solid var(--tvn-btn-border-strong);">
  <span aria-hidden="true">👎</span><span data-i18n="btn_no_need_help">No, I still need help</span>
  </button>
  </div>
