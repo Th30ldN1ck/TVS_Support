@@ -32,8 +32,24 @@
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="index, follow">
-<title>Help Centre | TrueVisions NOW</title>
-<meta name="description" content="Get help with your TrueVisions NOW account, billing, streaming, devices, downloads and parental controls.">
+<title id="tvn-meta-title">Help Centre | TrueVisions NOW</title>
+<meta id="tvn-meta-description" name="description" content="Get help with your TrueVisions NOW account, billing, streaming, devices, downloads and parental controls.">
+<!-- Canonical/OG/Twitter tags are kept in sync per-article by the router below
+     (see window._tvnUpdateMeta), which works for any renderer that executes
+     JS (including Google's indexer) and for anyone sharing/bookmarking a
+     link in a real browser. It does NOT help non-JS link-preview bots
+     (Slack, X, iMessage, etc.) — those will keep showing this fallback
+     until the site has real per-article URLs instead of #hash routing,
+     since they read the raw HTML only and never run the page's scripts. -->
+<link id="tvn-meta-canonical" rel="canonical" href="https://tvs-support.vercel.app/support.html">
+<meta id="tvn-meta-og-title" property="og:title" content="Help Centre | TrueVisions NOW">
+<meta id="tvn-meta-og-description" property="og:description" content="Get help with your TrueVisions NOW account, billing, streaming, devices, downloads and parental controls.">
+<meta id="tvn-meta-og-url" property="og:url" content="https://tvs-support.vercel.app/support.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TrueVisions NOW">
+<meta name="twitter:card" content="summary">
+<meta id="tvn-meta-twitter-title" name="twitter:title" content="Help Centre | TrueVisions NOW">
+<meta id="tvn-meta-twitter-description" name="twitter:description" content="Get help with your TrueVisions NOW account, billing, streaming, devices, downloads and parental controls.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -353,6 +369,8 @@ window.I18N = {
     page_title_search_after: '” | TrueVisions NOW Support',
     page_title_suffix: ' | TrueVisions NOW Support',
     page_title_article_fallback: 'Article',
+    search_meta_description_before: 'Search results for "',
+    search_meta_description_after: '" in the TrueVisions NOW Help Centre.',
     article_not_found_title: 'Article not found',
     updated_prefix: 'Updated',
   },
@@ -465,6 +483,8 @@ window.I18N = {
     page_title_search_after: '” | TrueVisions NOW ศูนย์ช่วยเหลือ',
     page_title_suffix: ' | TrueVisions NOW ศูนย์ช่วยเหลือ',
     page_title_article_fallback: 'บทความ',
+    search_meta_description_before: 'ผลการค้นหาสำหรับ "',
+    search_meta_description_after: '" ในศูนย์ช่วยเหลือ TrueVisions NOW',
     article_not_found_title: 'ไม่พบบทความ',
     updated_prefix: 'อัปเดตเมื่อ',
   }
@@ -1582,6 +1602,54 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
     window.__tvnTrackArticle && window.__tvnTrackArticle(slug);
   }
 
+  var DEFAULT_DESCRIPTION = 'Get help with your TrueVisions NOW account, billing, streaming, devices, downloads and parental controls.';
+  var BASE_URL = 'https://tvs-support.vercel.app/support.html';
+
+  function stripToText(html, maxLen) {
+    var div = document.createElement('div');
+    div.innerHTML = (html || '').replace(/></g, '> <');
+    var text = (div.textContent || '').replace(/\s+/g, ' ').trim();
+    if (maxLen && text.length > maxLen) text = text.slice(0, maxLen).replace(/\s+\S*$/, '') + '…';
+    return text;
+  }
+
+  // Same as stripToText, but first drops the handful of hand-authored
+  // video/screenshot mockup blocks some older articles open with (the
+  // "Custom HTML" block in the CMS) — their decorative captions and
+  // timestamps would otherwise pollute the meta description. Those blocks
+  // are always a bare <div style="..."> with no class; the legitimate
+  // Tip/Note boxes always have both a class and a style, so this is safe.
+  function stripToTextForMeta(html, maxLen) {
+    var div = document.createElement('div');
+    div.innerHTML = html || '';
+    Array.prototype.slice.call(div.children).forEach(function(el) {
+      if (el.tagName === 'DIV' && !el.className) el.remove();
+    });
+    return stripToText(div.innerHTML, maxLen);
+  }
+
+  /* Keeps description/OG/Twitter tags in sync with document.title as the
+     hash route changes. Works for anything that executes JS (real browsers,
+     Google's renderer) — does NOT help non-JS link-preview bots, which only
+     ever see the static fallback tags in <head>. Canonical is deliberately
+     left untouched: with only one real document URL behind the #hash router,
+     a per-article canonical isn't meaningful yet (see the comment on that
+     tag). This becomes fully effective once real per-article URLs exist. */
+  function updateMeta(description, urlSuffix) {
+    var title = document.title;
+    var url = BASE_URL + (urlSuffix || '');
+    var set = function(id, value) {
+      var el = document.getElementById(id);
+      if (el) el.setAttribute('content', value);
+    };
+    set('tvn-meta-description', description);
+    set('tvn-meta-og-title', title);
+    set('tvn-meta-og-description', description);
+    set('tvn-meta-og-url', url);
+    set('tvn-meta-twitter-title', title);
+    set('tvn-meta-twitter-description', description);
+  }
+
   function route() {
     var h = (location.hash || '').replace('#', '');
     var listEl = document.getElementById('page-support');
@@ -1601,6 +1669,7 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
       window._tvnRenderSearchResults && window._tvnRenderSearchResults(query);
       window.scrollTo(0, 0);
       document.title = t.page_title_search_before + query + t.page_title_search_after;
+      updateMeta(t.search_meta_description_before + query + t.search_meta_description_after, '#support-search/' + encodeURIComponent(query));
       window.__tvnTrackPage && window.__tvnTrackPage('support-search');
     } else if (h.indexOf('support/') === 0 && h.length > 8) {
       var slug = h.slice(8);
@@ -1611,6 +1680,8 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
       var artForTitle = window.__SA && window.__SA[slug];
       var titleForTitle = artForTitle ? (localized(artForTitle, lang).title || t.page_title_article_fallback) : t.page_title_article_fallback;
       document.title = titleForTitle + t.page_title_suffix;
+      var descForMeta = artForTitle ? stripToTextForMeta(localized(artForTitle, lang).body, 160) : DEFAULT_DESCRIPTION;
+      updateMeta(descForMeta || DEFAULT_DESCRIPTION, '#support/' + slug);
     } else {
       hideAll();
       if (listEl) listEl.classList.remove('hidden');
@@ -1618,6 +1689,7 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
       if (heroSearch) heroSearch.value = '';
       window.scrollTo(0, 0);
       document.title = t.page_title_home;
+      updateMeta(DEFAULT_DESCRIPTION, '');
       window.__tvnTrackPage && window.__tvnTrackPage('support');
     }
   }
