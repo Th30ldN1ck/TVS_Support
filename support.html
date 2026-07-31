@@ -50,6 +50,16 @@
 <meta name="twitter:card" content="summary">
 <meta id="tvn-meta-twitter-title" name="twitter:title" content="Help Centre | TrueVisions NOW">
 <meta id="tvn-meta-twitter-description" name="twitter:description" content="Get help with your TrueVisions NOW account, billing, streaming, devices, downloads and parental controls.">
+<!-- Structured data, kept in sync per-route by the router below (same
+     tvn-jsonld tag, content replaced wholesale per view): FAQPage on the
+     support home, Article + BreadcrumbList on article pages. Note: Google
+     narrowed FAQPage rich-result eligibility to a small set of authoritative
+     sites in 2023, so this shouldn't be sold as a guaranteed rich snippet —
+     it's still correct, valid markup and may matter more once real
+     per-article URLs exist (see the dev brief). No schema is emitted on the
+     search-results view; that's dynamic/thin content Google advises against
+     marking up. -->
+<script type="application/ld+json" id="tvn-jsonld"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -1650,6 +1660,71 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
     set('tvn-meta-twitter-description', description);
   }
 
+  function setSchema(obj) {
+    var el = document.getElementById('tvn-jsonld');
+    if (el) el.textContent = obj ? JSON.stringify(obj) : '';
+  }
+
+  function breadcrumbSchema(items) {
+    // items: [{ name, url }], root-first.
+    return {
+      '@type': 'BreadcrumbList',
+      itemListElement: items.map(function(item, i) {
+        return { '@type': 'ListItem', position: i + 1, name: item.name, item: item.url };
+      }),
+    };
+  }
+
+  function homeFaqSchema(lang) {
+    var data = window.__SA || {};
+    var t = window.I18N[lang];
+    var questions = Object.keys(data).map(function(slug) {
+      var l10n = localized(data[slug], lang);
+      return {
+        '@type': 'Question',
+        name: l10n.title || slug,
+        acceptedAnswer: { '@type': 'Answer', text: stripToTextForMeta(l10n.body, 300) },
+      };
+    });
+    return {
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'FAQPage', mainEntity: questions },
+        {
+          '@type': 'WebSite',
+          name: t.page_title_home,
+          url: BASE_URL,
+        },
+      ],
+    };
+  }
+
+  function articleSchema(art, l10n, slug, lang) {
+    var catInfo = window.CAT_LABELS[art.catSlug];
+    var t = window.I18N[lang];
+    var crumbs = breadcrumbSchema([
+      { name: t.header_help_centre, url: BASE_URL },
+      { name: catInfo ? catInfo[lang] : art.catSlug, url: BASE_URL + '#support' },
+      { name: l10n.title, url: BASE_URL + '#support/' + slug },
+    ]);
+    return {
+      '@context': 'https://schema.org',
+      '@graph': [
+        crumbs,
+        {
+          '@type': 'Article',
+          headline: l10n.title,
+          description: stripToTextForMeta(l10n.body, 300),
+          dateModified: art.updated,
+          datePublished: art.updated,
+          mainEntityOfPage: { '@type': 'WebPage', '@id': BASE_URL + '#support/' + slug },
+          publisher: { '@type': 'Organization', name: 'TrueVisions NOW' },
+          inLanguage: lang,
+        },
+      ],
+    };
+  }
+
   function route() {
     var h = (location.hash || '').replace('#', '');
     var listEl = document.getElementById('page-support');
@@ -1670,6 +1745,7 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
       window.scrollTo(0, 0);
       document.title = t.page_title_search_before + query + t.page_title_search_after;
       updateMeta(t.search_meta_description_before + query + t.search_meta_description_after, '#support-search/' + encodeURIComponent(query));
+      setSchema(null);
       window.__tvnTrackPage && window.__tvnTrackPage('support-search');
     } else if (h.indexOf('support/') === 0 && h.length > 8) {
       var slug = h.slice(8);
@@ -1682,6 +1758,7 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
       document.title = titleForTitle + t.page_title_suffix;
       var descForMeta = artForTitle ? stripToTextForMeta(localized(artForTitle, lang).body, 160) : DEFAULT_DESCRIPTION;
       updateMeta(descForMeta || DEFAULT_DESCRIPTION, '#support/' + slug);
+      setSchema(artForTitle ? articleSchema(artForTitle, localized(artForTitle, lang), slug, lang) : null);
     } else {
       hideAll();
       if (listEl) listEl.classList.remove('hidden');
@@ -1690,6 +1767,7 @@ window.__SA_READY = fetch('articles.json?v=' + Date.now())
       window.scrollTo(0, 0);
       document.title = t.page_title_home;
       updateMeta(DEFAULT_DESCRIPTION, '');
+      setSchema(homeFaqSchema(lang));
       window.__tvnTrackPage && window.__tvnTrackPage('support');
     }
   }
