@@ -177,7 +177,6 @@ body { background-color: var(--tvn-bg-page); font-family: 'Inter', sans-serif; o
 .hidden { display: none !important; }
 #sa-yes-btn:hover, #sa-not-helpful-btn:hover { background: var(--tvn-card-bg-hover); }
 .tvn-search-sticky.tvn-search-stuck { border-bottom: 1px solid var(--tvn-divider); }
-#sa-yes-btn:disabled, #sa-not-helpful-btn:disabled { cursor: default; }
 
 /* ── Tailwind utility overrides for light theme ─────────────────────
    Tailwind CDN generates fixed values per class, so it can't read CSS
@@ -761,6 +760,7 @@ tvnApplyI18n();
  <span aria-hidden="true">👎</span><span data-i18n="btn_no_need_help">No, I still need help</span>
  </button>
  </div>
+ <p id="sa-yes-thanks" class="hidden text-gray-400 text-sm" data-i18n="btn_yes_helpful_thanks">Thanks!</p>
  <div id="sa-survey" class="hidden mt-8 pt-8 border-t border-white/8">
  <p data-i18n="survey_heading" class="text-white font-bold text-base mb-5">What went wrong?</p>
  <div class="space-y-4" id="sa-survey-options">
@@ -815,17 +815,17 @@ tvnApplyI18n();
    pattern), then scrolls to contact after a reason is picked. ────── */
 (function() {
   window._tvnHelpfulYes = function(btn) {
-    var label = document.getElementById('sa-yes-btn-label');
-    if (label) label.textContent = window.I18N[window._tvnLang()].btn_yes_helpful_thanks;
-    btn.disabled = true;
-    btn.style.opacity = '0.6';
+    var btnsRow = document.getElementById('sa-helpful-btns');
+    var thanks = document.getElementById('sa-yes-thanks');
+    if (btnsRow) btnsRow.classList.add('hidden');
+    if (thanks) thanks.classList.remove('hidden');
     window.__tvnTrack && window.__tvnTrack({ event: 'article_helpful_yes', slug: (location.hash || '').replace('#support/', '') });
   };
 
   window._tvnShowSurvey = function() {
     var panel = document.getElementById('sa-survey');
-    var btn = document.getElementById('sa-not-helpful-btn');
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'default'; }
+    var btnsRow = document.getElementById('sa-helpful-btns');
+    if (btnsRow) btnsRow.classList.add('hidden');
     if (panel) {
       panel.classList.remove('hidden');
       panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -874,17 +874,15 @@ tvnApplyI18n();
   /* Reset feedback UI whenever a (new) article renders, so switching
      articles doesn't carry over "Thanks!" / survey state from the last one. */
   window._tvnResetArticleFeedback = function() {
-    var yesBtn = document.getElementById('sa-yes-btn');
-    var noBtn = document.getElementById('sa-not-helpful-btn');
+    var btnsRow = document.getElementById('sa-helpful-btns');
+    var yesThanks = document.getElementById('sa-yes-thanks');
     var panel = document.getElementById('sa-survey');
     var opts = document.getElementById('sa-survey-options');
     var thanks = document.getElementById('sa-survey-thanks');
     var otherBox = document.getElementById('sa-survey-other-box');
     var otherText = document.getElementById('sa-survey-other-text');
-    var yesLabel = document.getElementById('sa-yes-btn-label');
-    if (yesLabel) yesLabel.textContent = window.I18N[window._tvnLang()].btn_yes_helpful;
-    if (yesBtn) { yesBtn.disabled = false; yesBtn.style.opacity = ''; }
-    if (noBtn) { noBtn.disabled = false; noBtn.style.opacity = ''; noBtn.style.cursor = ''; }
+    if (btnsRow) btnsRow.classList.remove('hidden');
+    if (yesThanks) yesThanks.classList.add('hidden');
     if (panel) panel.classList.add('hidden');
     if (opts) { opts.classList.remove('hidden'); opts.querySelectorAll('input[type=radio]').forEach(function(r) { r.checked = false; }); }
     if (thanks) thanks.classList.add('hidden');
