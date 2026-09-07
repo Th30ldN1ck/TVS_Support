@@ -125,11 +125,13 @@ main {
 .search-wrap input:focus { border-color: var(--tvn-accent); }
 .btn-primary {
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--tvn-accent); color: #fff; font-weight: 700; font-size: 14.5px;
+  /* Brand magenta always, even in the light theme's otherwise-monochrome
+     accent -- this is the one CTA on the page and it should pop. */
+  background: #e91e8c; color: #fff; font-weight: 700; font-size: 14.5px;
   padding: 13px 28px; border-radius: 999px; text-decoration: none;
   transition: background-color .15s;
 }
-.btn-primary:hover { background: var(--tvn-accent-hover); }
+.btn-primary:hover { background: #d6007d; }
 </style>
 </head>
 <body>
